@@ -1,0 +1,30 @@
+# Inference API image. Long-running service; never imports pipeline/
+# training code (only pipeline.forecasting.FEATURE_NAMES, a constant —
+# see inference/service.py) and never writes to artifacts/, only reads it.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements-base.txt requirements-api.txt ./
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+COPY config/ ./config/
+COPY schemas/ ./schemas/
+COPY inference/ ./inference/
+# Only pipeline/forecasting.py and pipeline/logging_config.py are imported
+# at runtime (for FEATURE_NAMES and the shared logger) — copying the whole
+# package keeps the import path identical to local dev without a second
+# packaging layout to maintain.
+COPY pipeline/ ./pipeline/
+
+RUN useradd --create-home --uid 1000 api && chown -R api:api /app
+USER api
+
+ENV PCI_ARTIFACT_ROOT=/app/artifacts
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
+    CMD python -c "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/health',timeout=4).status==200 else sys.exit(1)"
+
+CMD ["uvicorn", "inference.api:app", "--host", "0.0.0.0", "--port", "8000"]

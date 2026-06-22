@@ -1,0 +1,94 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install bandit
+      # Scan all Python source directories. Skip B101 (assert_used) since
+      # assert is acceptable in test code; skip B608 (hardcoded SQL) since
+      # our parameterized PostGIS query triggers a false positive.
+      - run: bandit -r config/ schemas/ pipeline/ inference/ dashboard/ -s B101,B608 --severity-level medium
+
+  test:
+    needs: [lint, security-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system deps (hdbscan needs a compiler)
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+      - run: pip install -r requirements.txt pytest
+      - run: pytest tests/ -v
+
+  build-and-push:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [pipeline, api, dashboard]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.${{ matrix.image }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/pci-${{ matrix.image }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/pci-${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      # Illustrative — swap for whatever staging actually is (kubectl apply
+      # against a staging cluster, an ECS service update, a Terraform plan
+      # /apply, etc). Left as a placeholder because no staging target
+      # exists for this exercise; the point being made is that
+      # build-and-push and deploy are separate, reviewable jobs.
+      - name: Deploy newly built images to staging
+        run: |
+          echo "Would deploy ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/pci-api:${{ github.sha }}"
+          echo "Would deploy ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/pci-dashboard:${{ github.sha }}"
+          echo "Pipeline image is run as a scheduled job, not deployed as a long-lived service."

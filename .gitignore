@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+venv/
+venv311/
+.pytest_cache/
+.ruff_cache/
+artifacts/
+.ipynb_checkpoints/
+data/
+.venv/
+.vscode/
+.idea/
+*.egg-info/
+.env
+.DS_Store
+Thumbs.db
+

@@ -1,0 +1,10 @@
+-r requirements-base.txt
+dask[dataframe]
+hdbscan
+xgboost==3.2.0
+scikit-learn==1.6.1
+folium
+joblib
+pyyaml==6.0.2
+sqlalchemy
+psycopg2-binary

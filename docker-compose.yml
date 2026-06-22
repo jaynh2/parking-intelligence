@@ -1,0 +1,77 @@
+# Local/staging orchestration. Three independently-scalable services that
+# share nothing except the artifacts volume (pipeline writes, api reads).
+#
+#   docker compose run --rm pipeline        # train once, populate artifacts/
+#   docker compose up api dashboard         # bring up the serving stack
+#   docker compose --profile postgis up     # also bring up a local PostGIS
+#                                            # for testing PCI_DATA_BACKEND=postgis
+#
+# In production, "pipeline" is a scheduled job (k8s CronJob / ECS scheduled
+# task / Airflow), not a compose service kept running — it's defined here
+# under a profile so `docker compose up` never starts it by accident.
+
+services:
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    profiles: ["training"]
+    environment:
+      PCI_CSV_PATH: ${PCI_CSV_PATH:-/app/data/violations.csv}
+      PCI_DATA_BACKEND: ${PCI_DATA_BACKEND:-dask}
+      PCI_POSTGIS_DSN: ${PCI_POSTGIS_DSN:-postgresql://pci:pci@postgis:5432/traffic_db}
+      PCI_LOG_LEVEL: ${PCI_LOG_LEVEL:-INFO}
+    volumes:
+      - artifacts:/app/artifacts
+      - ./data:/app/data:ro
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      PCI_CACHE_TTL_SECONDS: ${PCI_CACHE_TTL_SECONDS:-60}
+      PCI_LOG_LEVEL: ${PCI_LOG_LEVEL:-INFO}
+    volumes:
+      - artifacts:/app/artifacts:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/health',timeout=4).status==200 else sys.exit(1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      PCI_API_BASE_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: a real PostGIS instance so PCI_DATA_BACKEND=postgis can be
+  # exercised locally instead of only against the documented-but-untested
+  # code path. Start with: docker compose --profile postgis up
+  postgis:
+    image: postgis/postgis:16-3.4
+    profiles: ["postgis"]
+    environment:
+      POSTGRES_DB: traffic_db
+      POSTGRES_USER: pci
+      POSTGRES_PASSWORD: pci
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  artifacts:
+  pgdata:
