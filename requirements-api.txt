@@ -7,3 +7,4 @@ xgboost==3.2.0
 slowapi==0.1.10
 prometheus-fastapi-instrumentator==7.1.0
 prometheus-client==0.22.1
+httpx
