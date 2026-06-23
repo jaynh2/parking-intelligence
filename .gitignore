@@ -6,7 +6,11 @@ venv311/
 .ruff_cache/
 artifacts/
 .ipynb_checkpoints/
+<<<<<<< HEAD
 
+=======
+data/
+>>>>>>> 3c5aedddb3304736214e98a28975c92f1a33ae58
 .venv/
 .vscode/
 .idea/
