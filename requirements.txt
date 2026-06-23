@@ -1,0 +1,6 @@
+# For local development only. Production images build from the split
+# requirements-{pipeline,api,dashboard}.txt files instead, so each
+# container only carries the dependencies it actually needs.
+-r requirements-pipeline.txt
+-r requirements-api.txt
+-r requirements-dashboard.txt

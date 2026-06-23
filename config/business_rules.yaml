@@ -1,0 +1,50 @@
+# Business rules for the Parking Congestion Intelligence pipeline.
+# Edit this file to adjust enforcement priorities — no code changes required,
+# just a new training run to pick up the updated rules.
+#
+# These values map directly to pipeline/impact_scoring.py:
+#   - severity_mapping: keywords matched against violation_type_clean (highest match wins)
+#   - vehicle_weight_mapping: vehicle_type → relative impact multiplier (1=lightest, 4=heaviest)
+#
+# Any keyword not listed in severity_mapping falls back to default_severity (1.0).
+# Any vehicle_type not listed in vehicle_weight_mapping falls back to default_vehicle_weight (1).
+
+severity_mapping:
+  PARKING NEAR ROAD CROSSING: 3.0      # highest risk: pedestrian safety
+  PARKING ON FOOTPATH: 2.5             # accessibility obstruction
+  PARKING NEAR FIRE HYDRANT: 2.5       # emergency services obstruction
+  PARKING ON A MAIN ROAD: 2.0          # traffic flow impact
+  PARKING IN A MAIN ROAD: 2.0
+  NO PARKING: 1.5                       # designated no-parking zone
+  WRONG PARKING: 1.0                    # general incorrect parking
+
+vehicle_weight_mapping:
+  # Two-wheelers (weight = 1)
+  MOTOR CYCLE: 1
+  SCOOTER: 1
+  MOPED: 1
+  # Light motor vehicles — autos and small goods (weight = 1)
+  PASSENGER AUTO: 1
+  GOODS AUTO: 1
+  AUTO RICKSHAW: 1
+  # Cars and light commercial (weight = 2)
+  CAR: 2
+  JEEP: 2
+  VAN: 2
+  MAXI-CAB: 2
+  TEMPO: 2
+  # Medium goods and tractor (weight = 3)
+  TRACTOR: 3
+  MINI LORRY: 3
+  LGV: 3
+  # Heavy vehicles — buses and trucks (weight = 4)
+  TANKER: 4
+  HGV: 4
+  HEAVY GOODS VEHICLE: 4
+  LORRY/GOODS VEHICLE: 4
+  BUS: 4
+  BUS (BMTC/KSRTC): 4
+  PRIVATE BUS: 4
+  TOURIST BUS: 4
+  FACTORY BUS: 4
+  SCHOOL VEHICLE: 4

@@ -1,0 +1,5 @@
+pandas==2.2.3
+numpy==2.2.6
+pydantic==2.10.6
+pydantic-settings==2.7.1
+pyarrow==24.0.0

@@ -1,0 +1,29 @@
+# Training pipeline image. Run as a one-shot job (k8s Job/CronJob, ECS
+# scheduled task, Airflow operator, etc) — it is NOT a long-running server.
+# Writes to /app/artifacts, which should be a volume shared with the API
+# image (see docker-compose.yml) so a new run is picked up without
+# rebuilding or restarting inference/dashboard.
+FROM python:3.12-slim AS base
+
+# build-essential is needed for hdbscan's Cython/C extensions when no
+# prebuilt wheel matches the target platform (e.g. arm64 base images).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements-base.txt requirements-pipeline.txt ./
+RUN pip install --no-cache-dir -r requirements-pipeline.txt
+
+COPY config/ ./config/
+COPY schemas/ ./schemas/
+COPY pipeline/ ./pipeline/
+
+RUN useradd --create-home --uid 1000 pipeline && chown -R pipeline:pipeline /app
+USER pipeline
+
+ENV PCI_ARTIFACT_ROOT=/app/artifacts
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "-m", "pipeline.train_pipeline"]
