@@ -224,3 +224,6 @@ def map_html(request: Request) -> FileResponse:
         media_type="text/html",
         headers={"Cache-Control": "public, max-age=300"},  # 5-min browser cache for the 9MB file
     )
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "Parking API is running"}
